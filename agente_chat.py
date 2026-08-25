@@ -23,6 +23,12 @@ PREGUNTAS_SUGERIDAS = [
     "¿Qué perfil y capital estoy usando?",
 ]
 
+FOLLOWUPS = [
+    "¿Y cuánto puedo perder?",
+    "¿Ganamos al S&P 500?",
+    "¿Qué cambia con 10 activos?",
+]
+
 FUERA_DE_ALCANCE = (
     "Solo respondo sobre el **portafolio, riesgo, mandato y resultados del simulador** "
     "de este proyecto (Grupo 3 · UTEC).\n\n"
@@ -34,7 +40,6 @@ FUERA_DE_ALCANCE = (
     "• ¿Ganamos al S&P 500?"
 )
 
-# Intenciones: (id, keywords). Más keywords = más formas de preguntar.
 INTENCIONES = {
     "cartera": [
         "empresa", "empresas", "invertir", "inversion", "invierta", "invierto", "invertiria",
@@ -49,6 +54,7 @@ INTENCIONES = {
         "recomienda comprar", "recomendacion de compra", "sugerencia de inversion",
         "deberia", "deberia invertir", "donde invertir", "en cuales", "cuales empresas",
         "dame 3", "dame tres", "top 3", "las 3", "tres empresas", "pocas empresas",
+        "por que este", "por que gld", "por que nvda", "explica el activo",
     ],
     "elegible": [
         "elegible", "elegibilidad", "aprueba", "aprobado", "aprobar", "semaforo",
@@ -90,6 +96,7 @@ INTENCIONES = {
         "10 activo", "5 activo", "15 activo", "20 activo", "numero de activo",
         "n de activo", "cuantos activo", "cantidad de activo", "diversific",
         "menos activo", "mas activo", "reducir activo", "ampliar universo",
+        "y con 10", "y con 5", "con 10 activos", "con 5 activos",
     ],
     "config": [
         "perfil", "horizonte", "meses", "parametro", "configur",
@@ -107,6 +114,14 @@ INTENCIONES = {
         "ayuda", "que puedo preguntar", "que preguntas", "opciones", "menu",
         "como funciona", "para que sirves", "que haces", "alcance",
         "en que me ayudas", "temas",
+    ],
+    "saludo": [
+        "hola", "buenas", "buen dia", "buena tarde", "buena noche",
+        "hey", "hello", "hi", "que tal", "saludos",
+    ],
+    "gracias": [
+        "gracias", "muchas gracias", "ok gracias", "perfecto gracias",
+        "listo gracias", "te agradezco",
     ],
 }
 
@@ -129,6 +144,27 @@ FUERA = {
     "minecraft", "quien gano", "cuentame un", "escribe un poema", "traduce esto",
     "receta de", "como cocinar", "serie de", "actor", "actriz", "tiktok",
     "instagram", "whatsapp", "chisme", "chismes",
+}
+
+ROLES_ACTIVO = {
+    "GLD": "Cobertura defensiva (commodities / oro) ante inflación y estrés de mercado.",
+    "SLV": "Exposición a metales preciosos complementaria al oro.",
+    "USO": "Exposición a energía / crudo dentro de commodities.",
+    "NVDA": "Crecimiento tecnológico de alto momentum; peso limitado por tope 15%.",
+    "XOM": "Energía defensiva-cíclica dentro de renta variable EE.UU.",
+    "JNJ": "Salud defensiva; aporta estabilidad relativa al bloque de acciones.",
+    "WMT": "Consumo defensivo; menor sensibilidad a ciclos fuertes.",
+    "KO": "Consumo defensivo / dividendos estables.",
+    "MSFT": "Tecnología de calidad con rol de crecimiento moderado.",
+    "AAPL": "Tecnología de gran capitalización; diversifica el bloque growth.",
+    "META": "Tecnología / comunicación; aportación de retorno con mayor volatilidad.",
+    "GOOGL": "Tecnología de gran capitalización orientada a crecimiento.",
+    "AMZN": "Consumo discrecional / tecnología; alto beta relativo.",
+    "TSLA": "Crecimiento volátil; solo con peso controlado por mandato.",
+    "JPM": "Financiero EE.UU.; exposición cíclica bancaria.",
+    "HYG": "Bonos high yield: ingreso y diversificación de renta fija.",
+    "SCHH": "REITs EE.UU.: diversificación inmobiliaria.",
+    "RWX": "REITs internacionales: diversificación geográfica inmobiliaria.",
 }
 
 
@@ -156,7 +192,6 @@ def _score(q: str, keywords: list[str]) -> int:
     score = 0
     for k in keywords:
         if k in q:
-            # Frases largas pesan más
             score += 2 if " " in k else 1
     return score
 
@@ -166,24 +201,35 @@ def _tiene_dominio(q: str) -> bool:
 
 
 def _es_fuera_de_tema(q: str) -> bool:
-    if any(f in q for f in FUERA) and not _tiene_dominio(q):
-        return True
-    if q in {"hola", "hi", "hello", "hey", "buenas", "que tal", "gracias", "ok", "vale"}:
-        return True
-    return False
+    return any(f in q for f in FUERA) and not _tiene_dominio(q)
+
+
+def _es_saludo_puro(q: str) -> bool:
+    saludos = {"hola", "hi", "hello", "hey", "buenas", "que tal", "saludos",
+               "buen dia", "buena tarde", "buena noche"}
+    return q in saludos or (len(q.split()) <= 3 and _score(q, INTENCIONES["saludo"]) > 0
+                            and not _tiene_dominio(q))
+
+
+def _es_gracias_puro(q: str) -> bool:
+    return q in {"gracias", "ok", "vale", "perfecto", "listo", "muchas gracias",
+                 "ok gracias", "perfecto gracias"} or (
+        "gracias" in q and not _tiene_dominio(q) and len(q.split()) <= 4
+    )
 
 
 def _mejor_intencion(q: str) -> tuple[str | None, int]:
     mejor, mejor_score = None, 0
     for nombre, keys in INTENCIONES.items():
+        if nombre in {"saludo", "gracias"}:
+            continue
         s = _score(q, keys)
         if s > mejor_score:
             mejor, mejor_score = nombre, s
-    # Prioridad fuerte a preguntas de inversión / empresas
     if any(p in q for p in (
         "donde pongo", "donde va", "donde esta", "en que invertir", "donde invertir",
         "en que empresas", "que empresas", "cuales empresas", "que acciones",
-        "que comprar", "deberia invertir", "donde invertir", "dame 3", "dame tres",
+        "que comprar", "deberia invertir", "dame 3", "dame tres",
         "top 3", "tres empresas",
     )):
         return "cartera", max(mejor_score, 8)
@@ -193,7 +239,6 @@ def _mejor_intencion(q: str) -> tuple[str | None, int]:
 
 
 def _extraer_n(q: str, default: int = 5) -> int:
-    """Detecta 'dame 3', 'top 5', etc."""
     m = re.search(r"(?:dame|top|las?|muestra(?:me)?|lista(?:me)?)\s*(\d{1,2})", q)
     if m:
         return max(1, min(int(m.group(1)), 15))
@@ -204,9 +249,27 @@ def _extraer_n(q: str, default: int = 5) -> int:
     return default
 
 
+def _followup_hint() -> str:
+    return "\n\n_También puedes preguntar:_ " + " · ".join(f"*{f}*" for f in FOLLOWUPS[:2])
+
+
 def _respuesta_cartera(sim: dict, q: str = "") -> str:
     moneda = sim["moneda"]
     pesos = sim["pesos"]
+    # ¿Pregunta por un ticker concreto?
+    for t in pesos["Ticker"].tolist():
+        if t.lower() in q:
+            row = pesos.loc[pesos["Ticker"] == t].iloc[0]
+            rol = ROLES_ACTIVO.get(t, "Forma parte de la selección diversificada del mandato.")
+            return (
+                f"**{t}** ({row['Clase de Activo']})\n\n"
+                f"• Peso: **{_pct(row['Peso'])}**\n"
+                f"• Capital: **{_money(row['Capital'], moneda)}**\n"
+                f"• Rol: {rol}\n\n"
+                "Sujeto a piso 1% / tope 15%. No es una recomendación personalizada."
+                + _followup_hint()
+            )
+
     n = _extraer_n(q, default=5)
     top = pesos.head(n)
     lineas = "\n".join(
@@ -226,6 +289,7 @@ def _respuesta_cartera(sim: dict, q: str = "") -> str:
         f"Diversificación: **{sim['diversificacion']:.2f}**.\n\n"
         "Simulación académica con tope 15% por activo — no es una orden de compra "
         "ni consejo personalizado de inversión."
+        + _followup_hint()
     )
 
 
@@ -234,16 +298,28 @@ def responder(pregunta: str, sim: dict) -> str:
     if not q:
         return "Escribe una pregunta sobre el portafolio o elige una sugerida."
 
+    if _es_saludo_puro(q):
+        return (
+            f"Hola. Soy el asistente del portafolio **Grupo 3**.\n\n"
+            f"Escenario actual: **{sim['perfil']}** · {sim['n_activos']} activos · "
+            f"{sim['horizonte_meses']} m · VaR {int(sim['confianza']*100)}%.\n\n"
+            "Pregúntame por empresas, riesgo, Sharpe, elegibilidad o vs S&P 500."
+        )
+
+    if _es_gracias_puro(q):
+        return (
+            "Con gusto. Si quieres seguir, prueba *¿Cuánto puedo perder?* "
+            "o *¿Ganamos al S&P 500?*"
+        )
+
     if _es_fuera_de_tema(q):
         return FUERA_DE_ALCANCE
 
     intencion, score = _mejor_intencion(q)
 
-    # Sin match claro y sin palabras del dominio → rechazo
     if score == 0 and not _tiene_dominio(q):
         return FUERA_DE_ALCANCE
 
-    # Match débil: pedir reformulación con sugerencias
     if score == 0:
         sugeridas = "\n".join(f"• {p}" for p in PREGUNTAS_SUGERIDAS[:6])
         return (
@@ -258,12 +334,10 @@ def responder(pregunta: str, sim: dict) -> str:
     hor = sim["horizonte_meses"]
     pesos = sim["pesos"]
 
-    # Desempate: "recomienda invertir en empresas" → cartera, no elegible
     if intencion == "elegible" and _score(q, INTENCIONES["cartera"]) >= score:
         intencion = "cartera"
     if intencion == "retorno" and _score(q, INTENCIONES["riesgo"]) > score:
         intencion = "riesgo"
-    # "ganar al mercado" → benchmark
     if intencion == "retorno" and _score(q, INTENCIONES["benchmark"]) >= 2:
         intencion = "benchmark"
 
@@ -272,7 +346,9 @@ def responder(pregunta: str, sim: dict) -> str:
 
     if intencion == "elegible":
         ok = crit["sharpe_ok"] and crit["vol_ok"] and crit["vs_mercado_ok"]
-        estado = "PORTAFOLIO ELEGIBLE" if ok else "REVISAR CRITERIOS"
+        estado = "PORTAFOLIO ELEGIBLE 🟢" if ok else "REVISAR CRITERIOS 🟡"
+        if not crit["sharpe_ok"] and not crit["vol_ok"]:
+            estado = "NO ELEGIBLE 🔴"
         return (
             f"**{estado}** con el perfil **{sim['perfil']}**.\n\n"
             f"• Sharpe {_num(sim['sharpe'])} "
@@ -282,6 +358,7 @@ def responder(pregunta: str, sim: dict) -> str:
             f"• Vs S&P 500: Sharpe mercado {_num(bm['sharpe'])} "
             f"({'superamos ✅' if crit['vs_mercado_ok'] else 'no superamos ❌'})\n\n"
             "La decisión final la toma el **comité humano**; el agente solo reporta evidencia."
+            + _followup_hint()
         )
 
     if intencion == "riesgo":
@@ -294,6 +371,7 @@ def responder(pregunta: str, sim: dict) -> str:
             f"Comparado con el S&P 500: VaR {_pct(bm['var'])} "
             f"({_money(bm['var_soles'], moneda)}).\n\n"
             "Es una estimación del modelo, no una garantía."
+            + _followup_hint()
         )
 
     if intencion == "retorno":
@@ -306,6 +384,7 @@ def responder(pregunta: str, sim: dict) -> str:
             f"• Favorable (+1σ): {_money(sim['favorable'], moneda)}\n"
             f"• Adverso (−1σ): {_money(sim['adverso'], moneda)}\n\n"
             "Simulación académica; no garantiza resultados futuros."
+            + _followup_hint()
         )
 
     if intencion == "benchmark":
@@ -318,6 +397,7 @@ def responder(pregunta: str, sim: dict) -> str:
             f"| Sharpe | {_num(sim['sharpe'])} | {_num(bm['sharpe'])} |\n"
             f"| VaR {conf}% | {_pct(sim['var_anual'])} | {_pct(bm['var'])} |\n\n"
             f"Exceso de retorno: **{(sim['retorno_anual']-bm['retorno_anual'])*100:+.2f} pp**."
+            + _followup_hint()
         )
 
     if intencion == "concentracion":
