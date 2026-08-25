@@ -1,0 +1,7 @@
+Escenario,Retorno esperado (%),VaR parametrico 95% diario (%),VaR 95% a 1 anio (%),CVaR 95% a 1 anio (%),Ratio de Sharpe,Volatilidad anual (%),Valor proyectado (S/)
+Max. Sharpe - Adverso,12.39,1.33,-4.6,1.7,1.57,13.8,1123927.0
+Max. Sharpe - Esperado,26.19,1.33,-4.6,1.7,1.57,13.8,1261902.0
+Max. Sharpe - Favorable,39.99,1.33,-4.6,1.7,1.57,13.8,1399876.0
+Benchmark - Adverso,-1.9,1.67,10.5,16.2,0.62,16.72,981049.0
+Benchmark - Esperado,14.83,1.67,10.5,16.2,0.62,16.72,1148272.0
+Benchmark - Favorable,31.55,1.67,10.5,16.2,0.62,16.72,1315495.0

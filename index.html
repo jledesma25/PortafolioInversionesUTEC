@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ComitéQuant · Agente de gobernanza</title>
+  <style>
+    :root {
+      --bg: #0c1220;
+      --bg-2: #121a2e;
+      --card: #17233c;
+      --line: #2a3a5c;
+      --gold: #c9a227;
+      --gold-2: #e8c547;
+      --text: #e8eef8;
+      --muted: #8b9bb8;
+      --green: #3dba7a;
+      --red: #e05a4f;
+      --ok-bg: rgba(61, 186, 122, 0.12);
+      --bad-bg: rgba(224, 90, 79, 0.14);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1a2744 0%, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(12, 18, 32, 0.92);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--gold), #8a6d12);
+      color: #111; font-weight: 800; display: grid; place-items: center;
+    }
+    .brand h1 { font-size: 18px; letter-spacing: 0.08em; }
+    .brand span { color: var(--muted); font-size: 12px; display: block; }
+    .pill {
+      font-size: 12px; color: var(--gold-2); border: 1px solid var(--gold);
+      padding: 6px 12px; border-radius: 999px;
+    }
+    nav { display: flex; gap: 8px; padding: 16px 32px 0; flex-wrap: wrap; }
+    nav button {
+      background: transparent; color: var(--muted); border: none;
+      padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent;
+      font-size: 14px;
+    }
+    nav button.active { color: var(--gold-2); border-bottom-color: var(--gold); }
+    main { padding: 24px 32px 88px; max-width: 1180px; margin: 0 auto; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .hero { text-align: center; padding: 48px 16px 24px; }
+    .hero p.kicker { color: var(--gold); letter-spacing: 0.16em; font-size: 12px; }
+    .hero h2 { font-size: clamp(26px, 4vw, 36px); margin: 16px 0; line-height: 1.25; }
+    .hero p { color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+    .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      background: var(--gold); color: #111; border: none; padding: 12px 20px;
+      border-radius: 8px; font-weight: 700; cursor: pointer;
+    }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    .pipeline { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 36px; }
+    .pipeline span {
+      background: var(--card); border: 1px solid var(--line); padding: 8px 12px;
+      border-radius: 6px; font-size: 12px; color: var(--muted);
+    }
+    .banner {
+      border-radius: 12px; padding: 22px 24px; margin-bottom: 22px;
+      background: var(--bad-bg); border: 1px solid var(--red);
+    }
+    .banner strong { font-size: 22px; display: block; margin-bottom: 6px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px;
+    }
+    .card h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .kpi { font-size: 28px; font-weight: 700; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 14px; font-size: 13px; }
+    .meta span { color: var(--muted); }
+    .split { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; }
+    .bar { height: 10px; background: #243353; border-radius: 99px; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--gold); }
+    .warn { color: #f0c674; font-size: 13px; margin-top: 12px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .chips button {
+      background: var(--bg-2); color: var(--text); border: 1px solid var(--line);
+      padding: 8px 12px; border-radius: 999px; cursor: pointer; font-size: 13px;
+    }
+    .chips button:hover, .chips button.active-q { border-color: var(--gold); color: var(--gold-2); }
+    .chat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+    .q { color: var(--gold-2); margin-bottom: 8px; }
+    .a { color: var(--text); line-height: 1.55; }
+    footer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0a1020; border-top: 1px solid var(--line);
+      color: var(--muted); font-size: 11px; padding: 10px 32px;
+    }
+    .note { font-size: 12px; color: var(--muted); margin: 8px 0 18px; }
+    .scenarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    .tag { font-size: 11px; color: var(--muted); }
+    @media (max-width: 900px) {
+      .cards, .split, .scenarios { grid-template-columns: 1fr; }
+      header, main, footer { padding-left: 16px; padding-right: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="mark">CQ</div>
+      <div>
+        <h1>COMITÉQUANT</h1>
+        <span>Agente de gobernanza para inversión privada</span>
+      </div>
+    </div>
+    <div class="pill">MOCKUP · cifras de ejemplo, no son las de tu Colab</div>
+  </header>
+
+  <nav>
+    <button class="active" data-screen="inicio">Inicio</button>
+    <button data-screen="decision">Decisión</button>
+    <button data-screen="cartera">Cartera</button>
+    <button data-screen="riesgo">Riesgo</button>
+    <button data-screen="agente">Agente</button>
+  </nav>
+
+  <main>
+    <section id="inicio" class="screen active">
+      <div class="hero">
+        <p class="kicker">MANDATO · S/ 1,000,000 · 12 MESES</p>
+        <h2>Un agente que puede decir que no<br>antes de vender un portafolio.</h2>
+        <p>Universo cerrado de 20 activos, peso máximo 15%, sin ventas en corto ni apalancamiento. Comparación obligatoria contra el S&P 500 y semáforo de elegibilidad.</p>
+        <div class="row">
+          <button class="btn" onclick="go('decision')">Ver decisión del agente</button>
+          <button class="btn ghost" onclick="go('agente')">Preguntar al comité</button>
+        </div>
+        <div class="pipeline">
+          <span>1. Datos</span><span>2. Asignación</span><span>3. Riesgo</span>
+          <span>4. Fuera de muestra</span><span>5. Semáforo</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="decision" class="screen">
+      <div class="banner">
+        <strong>● PORTAFOLIO NO ELEGIBLE</strong>
+        Falla: Sharpe fuera de muestra 0.87 &lt; 1.20. El agente no presenta esta cartera al comité.
+      </div>
+      <p class="note">Capital inicial S/ 1,000,000 · Tipo de cambio 3.39 · Horizonte 252 días · Benchmark ^GSPC</p>
+      <div class="cards">
+        <article class="card">
+          <h3>MÁXIMO SHARPE · propuesta</h3>
+          <div class="kpi">S/ 1,184,000</div>
+          <div class="tag">capital esperado a 12 meses</div>
+          <div class="meta">
+            <div><span>Retorno</span><br>18.4%</div>
+            <div><span>Volatilidad</span><br>16.1%</div>
+            <div><span>Sharpe</span><br>0.89</div>
+            <div><span>VaR 95% anual</span><br>S/ 72,000</div>
+          </div>
+        </article>
+        <article class="card">
+          <h3>MÍNIMA VOLATILIDAD · conservadora</h3>
+          <div class="kpi">S/ 1,112,000</div>
+          <div class="tag">capital esperado a 12 meses</div>
+          <div class="meta">
+            <div><span>Retorno</span><br>11.2%</div>
+            <div><span>Volatilidad</span><br>9.4%</div>
+            <div><span>Sharpe</span><br>0.77</div>
+            <div><span>VaR 95% anual</span><br>S/ 41,000</div>
+          </div>
+        </article>
+        <article class="card">
+          <h3>S&P 500 · benchmark</h3>
+          <div class="kpi">S/ 1,128,000</div>
+          <div class="tag">capital esperado a 12 meses</div>
+          <div class="meta">
+            <div><span>Retorno</span><br>12.8%</div>
+            <div><span>Volatilidad</span><br>15.2%</div>
+            <div><span>Sharpe</span><br>0.58</div>
+            <div><span>VaR 95% anual</span><br>S/ 81,000</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="cartera" class="screen">
+      <p class="note">Estrategia mostrada: Máximo Sharpe · tope 15% por activo</p>
+      <div class="split">
+        <article class="card">
+          <h3>Peso por clase</h3>
+          <p style="margin:12px 0 6px">Renta variable EE.UU. 72%</p>
+          <div class="bar"><i style="width:72%"></i></div>
+          <p style="margin:12px 0 6px">Commodities 14%</p>
+          <div class="bar"><i style="width:14%"></i></div>
+          <p style="margin:12px 0 6px">Bonos 8%</p>
+          <div class="bar"><i style="width:8%"></i></div>
+          <p style="margin:12px 0 6px">RV internacional 4%</p>
+          <div class="bar"><i style="width:4%"></i></div>
+          <p style="margin:12px 0 6px">REITs 2%</p>
+          <div class="bar"><i style="width:2%"></i></div>
+          <p class="warn">⚠ Alerta: RV EE.UU. supera 70%. Diversificación efectiva limitada.</p>
+        </article>
+        <article class="card">
+          <h3>Asignación de capital</h3>
+          <table>
+            <thead><tr><th>Ticker</th><th>Peso</th><th>Capital</th><th>Estado</th></tr></thead>
+            <tbody>
+              <tr><td>NVDA</td><td>15%</td><td>S/ 150,000</td><td>Seleccionado</td></tr>
+              <tr><td>MSFT</td><td>15%</td><td>S/ 150,000</td><td>Seleccionado</td></tr>
+              <tr><td>META</td><td>12%</td><td>S/ 120,000</td><td>Seleccionado</td></tr>
+              <tr><td>GLD</td><td>11%</td><td>S/ 110,000</td><td>Seleccionado</td></tr>
+              <tr><td>JPM</td><td>9%</td><td>S/ 90,000</td><td>Seleccionado</td></tr>
+              <tr><td>HYG</td><td>0%</td><td>S/ 0</td><td>Evaluado, no seleccionado</td></tr>
+              <tr><td>RWX</td><td>0%</td><td>S/ 0</td><td>Evaluado, no seleccionado</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </div>
+    </section>
+
+    <section id="riesgo" class="screen">
+      <div class="scenarios">
+        <article class="card"><h3>Adverso</h3><div class="kpi">S/ 838,000</div></article>
+        <article class="card"><h3>Esperado</h3><div class="kpi">S/ 1,184,000</div></article>
+        <article class="card"><h3>Favorable</h3><div class="kpi">S/ 1,530,000</div></article>
+      </div>
+      <article class="card">
+        <h3>Matriz de cumplimiento</h3>
+        <table>
+          <thead><tr><th>Criterio</th><th>Umbral</th><th>Resultado</th><th>Estado</th></tr></thead>
+          <tbody>
+            <tr><td>Universo cerrado</td><td>20 activos</td><td>20</td><td style="color:var(--green)">CUMPLE</td></tr>
+            <tr><td>Peso máximo</td><td>≤ 15%</td><td>15.0%</td><td style="color:var(--green)">CUMPLE</td></tr>
+            <tr><td>Sin apalancamiento</td><td>= 100%</td><td>100%</td><td style="color:var(--green)">CUMPLE</td></tr>
+            <tr><td>Sharpe fuera de muestra</td><td>≥ 1.20</td><td>0.87</td><td style="color:var(--red)">NO CUMPLE</td></tr>
+            <tr><td>VaR anual 95%</td><td>≤ 8%</td><td>7.2%</td><td style="color:var(--green)">CUMPLE</td></tr>
+            <tr><td>Drawdown simulado P95</td><td>≤ 15%</td><td>14.1%</td><td style="color:var(--green)">CUMPLE</td></tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
+    <section id="agente" class="screen">
+      <div class="chips">
+        <button class="active-q" onclick="ask(this, 'elegible')">¿Es elegible?</button>
+        <button onclick="ask(this, 'perder')">¿Cuánto puedo perder?</button>
+        <button onclick="ask(this, 'nvda')">¿Por qué no 100% NVDA?</button>
+        <button onclick="ask(this, 'spx')">¿Versus S&P 500?</button>
+      </div>
+      <div class="chat">
+        <p class="q" id="q">Comité: ¿El portafolio es elegible?</p>
+        <p class="a" id="a">Agente: No. La matriz de gobernanza exige Sharpe fuera de muestra ≥ 1.20. El resultado actual es 0.87. Aunque el VaR y el tope de 15% se cumplen, el agente bloquea la recomendación.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Simulación académica con datos históricos. No constituye recomendación de inversión, oferta ni garantía de rendimiento futuro. Cifras de este mockup son ilustrativas.
+  </footer>
+
+  <script>
+    const answers = {
+      elegible: [
+        "Comité: ¿El portafolio es elegible?",
+        "Agente: No. La matriz de gobernanza exige Sharpe fuera de muestra ≥ 1.20. El resultado actual es 0.87. Aunque el VaR y el tope de 15% se cumplen, el agente bloquea la recomendación."
+      ],
+      perder: [
+        "Comité: ¿Cuánto puedo perder a 12 meses con 95% de confianza?",
+        "Agente: Según block bootstrap (10,000 simulaciones, 252 días), el VaR anual 95% del Máximo Sharpe es 7.2% ≈ S/ 72,000. El CVaR de la cola es mayor. No es una garantía; es una simulación."
+      ],
+      nvda: [
+        "Comité: ¿Por qué no invertimos 100% en NVDA?",
+        "Agente: El mandato cierra el universo en 20 activos y limita cada peso a 15%. 100% en un solo ticker viola diversificación, el tope interno y el comparador vs S&P 500."
+      ],
+      spx: [
+        "Comité: ¿Ganamos al S&P 500?",
+        "Agente: En muestra, el Máximo Sharpe muestra mejor compensación riesgo-retorno (Sharpe 0.89 vs 0.58). Eso no basta: el filtro fuera de muestra no se cumple, así que no se presenta al comité."
+      ]
+    };
+
+    function go(id) {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      const tab = document.querySelector(`nav button[data-screen="${id}"]`);
+      if (tab) tab.classList.add("active");
+    }
+
+    function ask(btn, key) {
+      document.querySelectorAll(".chips button").forEach(b => b.classList.remove("active-q"));
+      btn.classList.add("active-q");
+      document.getElementById("q").textContent = answers[key][0];
+      document.getElementById("a").textContent = answers[key][1];
+    }
+
+    document.querySelectorAll("nav button").forEach(b => {
+      b.addEventListener("click", () => go(b.dataset.screen));
+    });
+  </script>
+</body>
+</html>
