@@ -23,6 +23,7 @@ from simulador import simular
 APP_DIR = Path(__file__).parent
 LOGO_UTEC = APP_DIR / "assets" / "logo_utec.png"
 LOGO_FALLBACK = APP_DIR / "assets" / "logo_utec.svg"
+LOGO_UTEC_MARK = APP_DIR / "assets" / "logo_utec_mark.png"
 HERO_CHARTS = APP_DIR / "assets" / "hero_charts.svg"
 
 NAV_PAGES = ["Resumen", "Simulador", "Cartera", "Riesgo", "Desempeño", "El asistente"]
@@ -47,7 +48,7 @@ _TEMA_OSCURO = "🌙  Oscuro"
 
 _tema_inicial = st.session_state.get("tema")
 if _tema_inicial is None or _tema_inicial not in (_TEMA_CLARO, _TEMA_OSCURO, "Claro", "Oscuro"):
-    st.session_state.tema = _TEMA_CLARO
+    st.session_state.tema = _TEMA_OSCURO
 elif _tema_inicial == "Claro":
     st.session_state.tema = _TEMA_CLARO
 elif _tema_inicial == "Oscuro":
@@ -58,10 +59,20 @@ if "demo_paso" not in st.session_state:
     st.session_state.demo_paso = -1
 
 # -- Sidebar --
+_logo_mark_b64 = ""
+if LOGO_UTEC_MARK.exists():
+    _logo_mark_b64 = base64.b64encode(LOGO_UTEC_MARK.read_bytes()).decode()
+elif LOGO_UTEC.exists():
+    _logo_mark_b64 = base64.b64encode(LOGO_UTEC.read_bytes()).decode()
+
 with st.sidebar:
+    _mark_html = (
+        f'<img class="sb-mark-img" src="data:image/png;base64,{_logo_mark_b64}" alt="UTEC"/>'
+        if _logo_mark_b64
+        else '<div class="sb-mark"><i></i><i></i><i></i><i></i></div>'
+    )
     st.markdown(
-        '<div class="sb-brand">'
-        '<div class="sb-mark"><i></i><i></i><i></i><i></i></div>'
+        f'<div class="sb-brand">{_mark_html}'
         '<div><div class="sb-title">PORTAFOLIO<br>ÓPTIMO</div>'
         '<div class="sb-sub">Asistente Cuantitativo<br>· Grupo 3</div></div></div>',
         unsafe_allow_html=True,
@@ -145,7 +156,12 @@ _COMMON_CSS = """
     margin-bottom: 28px; padding: 0 4px;
   }
   .sb-mark {
-    position: relative; flex: 0 0 34px; width: 34px; height: 34px;
+    position: relative; flex: 0 0 42px; width: 42px; height: 42px;
+  }
+  .sb-mark-img {
+    flex: 0 0 42px; width: 42px; height: 42px;
+    object-fit: contain; border-radius: 8px;
+    display: block;
   }
   .sb-mark i {
     position: absolute; width: 17px; height: 17px; border-radius: 5px;
