@@ -405,6 +405,30 @@ _COMMON_CSS = """
   .tab-hint { display:inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
   .foot { font-size: 12px; margin-top: 28px; padding-top: 12px; }
 
+  /* Metrics: show full money values (no "S/ 1,000,...") */
+  [data-testid="stMetricValue"],
+  [data-testid="stMetricValue"] > div,
+  [data-testid="stMetricValue"] div {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.15 !important;
+  }
+  [data-testid="stMetricValue"] {
+    font-size: 1.05rem !important;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-testid="stMetricDelta"],
+  [data-testid="stMetricDelta"] > div {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+  div[data-testid="stMetric"] {
+    min-width: 0 !important;
+  }
+
   @media (max-width: 900px) {
     .kpi-row { grid-template-columns: 1fr 1fr; }
     .hero { flex-direction: column; }
@@ -685,6 +709,50 @@ def fig_pesos(pesos: pd.DataFrame):
     grid = "rgba(0,0,0,0.06)" if not ES_OSCURO else "rgba(255,255,255,0.06)"
     fig.update_xaxes(title="Peso (%)", gridcolor=grid)
     fig.update_yaxes(title="", gridcolor=grid)
+    return fig
+
+
+def fig_pesos_top(pesos: pd.DataFrame, top_n: int = 8):
+    """Pie legible: top N tickers + 'Otros' con el resto agregado."""
+    df = pesos.copy().sort_values("Peso", ascending=False).reset_index(drop=True)
+    top_n = max(3, min(int(top_n), len(df)))
+    top = df.head(top_n).copy()
+    resto = df.iloc[top_n:]
+    if len(resto):
+        otros = pd.DataFrame(
+            [{
+                "Ticker": f"Otros ({len(resto)})",
+                "Peso": float(resto["Peso"].sum()),
+                "Capital": float(resto["Capital"].sum()),
+                "Clase de Activo": "Otros",
+            }]
+        )
+        plot_df = pd.concat([top[["Ticker", "Peso", "Capital", "Clase de Activo"]], otros], ignore_index=True)
+    else:
+        plot_df = top[["Ticker", "Peso", "Capital", "Clase de Activo"]]
+
+    fig = px.pie(
+        plot_df,
+        values="Peso",
+        names="Ticker",
+        hole=0.48,
+        color_discrete_sequence=PLOTLY_COLORS + ["#6B7C76"],
+        hover_data={"Capital": ":,.0f", "Peso": ":.2%"},
+    )
+    fig.update_traces(
+        textposition="outside",
+        textinfo="label+percent",
+        textfont_size=11,
+        pull=[0.03 if i < len(plot_df) - (1 if len(resto) else 0) else 0 for i in range(len(plot_df))],
+    )
+    fig.update_layout(
+        **{k: v for k, v in PLOTLY_LAYOUT.items() if k != "margin"},
+        height=360,
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.12, font=dict(size=10)),
+        margin=dict(l=10, r=10, t=36, b=8),
+        title=dict(text=f"Top {top_n} + Otros", font=dict(size=13), x=0.02),
+    )
     return fig
 
 
@@ -1091,6 +1159,8 @@ elif pagina == "Simulador":
     with left:
         st.markdown(f'{card_open("Asignación de capital")}', unsafe_allow_html=True)
         st.plotly_chart(fig_pesos(sim["pesos"]), use_container_width=True, key="plotly_pesos_sim")
+        st.caption("Barras: las 20 posiciones. Pie: Top 8 + resto agrupado.")
+        st.plotly_chart(fig_pesos_top(sim["pesos"], top_n=8), use_container_width=True, key="plotly_top_sim")
         st.markdown(card_close(), unsafe_allow_html=True)
     with right:
         st.markdown(f'{card_open(f"Escenarios a {horizonte} meses")}', unsafe_allow_html=True)
@@ -1142,6 +1212,8 @@ elif pagina == "Cartera":
                      hide_index=True, use_container_width=True,
                      height=min(520, 38 * len(tabla) + 40))
         st.plotly_chart(fig_pesos(sim["pesos"]), use_container_width=True, key="plotly_pesos_cartera")
+        st.caption("Barras: detalle completo. Pie: Top 8 + Otros (más legible).")
+        st.plotly_chart(fig_pesos_top(sim["pesos"], top_n=8), use_container_width=True, key="plotly_top_cartera")
         st.markdown(card_close(), unsafe_allow_html=True)
     with right:
         st.markdown(f'{card_open("Diversificación por clase")}', unsafe_allow_html=True)
