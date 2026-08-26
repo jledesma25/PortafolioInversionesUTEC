@@ -37,6 +37,9 @@ NAV_LABELS = {
     "El asistente": "🤖  El asistente",
 }
 
+# Imágenes fijas del notebook Colab (comparación). Pon True para volver a mostrarlas.
+SHOW_COLAB_REFS = False
+
 st.set_page_config(
     page_title="Portafolio Óptimo · Grupo 3",
     page_icon="◎",
@@ -804,6 +807,139 @@ def fig_bootstrap_vivo(sim: dict, n_sims: int = 5_000, semilla: int = 29):
     return fig
 
 
+def fig_vs_benchmark_vivo(sim: dict):
+    """Scatter vivo: portafolio actual vs S&P 500 (y perfiles de referencia)."""
+    from simulador import BASE, BENCHMARK
+
+    puntos = [
+        ("Portafolio actual", sim["vol_anual"] * 100, sim["retorno_anual"] * 100, _COLOR_CORAL, "star", 16),
+        ("Benchmark S&P 500", BENCHMARK["vol"] * 100, BENCHMARK["retorno"] * 100, "#8A9A95", "square", 12),
+    ]
+    for nombre, color, symbol in (
+        ("Conservador", "#7A9EAE", "circle"),
+        ("Agresivo", "#D3B1AF", "diamond"),
+    ):
+        if nombre == sim["perfil"]:
+            continue
+        b = BASE[nombre]
+        puntos.append((nombre, b["vol"] * 100, b["retorno"] * 100, color, symbol, 11))
+
+    fig = go.Figure()
+    for nombre, vol, ret, color, symbol, size in puntos:
+        fig.add_trace(go.Scatter(
+            x=[vol], y=[ret], mode="markers+text",
+            name=nombre, text=[nombre], textposition="top center",
+            marker=dict(size=size, color=color, symbol=symbol,
+                        line=dict(width=1, color="#F0EDE8" if ES_OSCURO else "#1A231F")),
+            textfont=dict(size=10),
+        ))
+    fig.update_layout(
+        **{k: v for k, v in PLOTLY_LAYOUT.items() if k != "margin"},
+        height=480,
+        legend=dict(orientation="h", y=1.14),
+        margin=dict(l=10, r=10, t=56, b=8),
+    )
+    fig.update_xaxes(title="Volatilidad anual (%)")
+    fig.update_yaxes(title="Retorno anual esperado (%)")
+    return fig
+
+
+def fig_frontera_aprox(sim: dict, n_cloud: int = 700, semilla: int = 29):
+    """Nube aproximada de portafolios con los activos del escenario (covarianza diagonal)."""
+    from math import sqrt
+    from simulador import BENCHMARK, RF
+
+    df = sim["pesos"].copy().reset_index(drop=True)
+    n = len(df)
+    if n == 0:
+        return go.Figure()
+
+    # Retornos/vols sintéticos por clase (calibrados al perfil actual)
+    clase_mu = {
+        "Renta variable EE.UU.": 0.22,
+        "Renta variable internacional": 0.14,
+        "Commodities": 0.12,
+        "Bonos": 0.05,
+        "REITs": 0.09,
+    }
+    clase_sig = {
+        "Renta variable EE.UU.": 0.28,
+        "Renta variable internacional": 0.20,
+        "Commodities": 0.22,
+        "Bonos": 0.06,
+        "REITs": 0.18,
+    }
+    # Escala para que el portafolio actual quede cerca del punto sim
+    mu_a = np.array([clase_mu.get(c, 0.12) for c in df["Clase de Activo"]], dtype=float)
+    sig_a = np.array([clase_sig.get(c, 0.18) for c in df["Clase de Activo"]], dtype=float)
+    w0 = df["Peso"].to_numpy(dtype=float)
+    w0 = w0 / w0.sum()
+    mu0 = float(w0 @ mu_a)
+    # covarianza diagonal + correlación suave
+    corr = 0.35
+    cov = np.outer(sig_a, sig_a) * corr
+    np.fill_diagonal(cov, sig_a ** 2)
+    sig0 = float(sqrt(w0 @ cov @ w0))
+    # Ajuste lineal para anclar al retorno/vol del simulador
+    scale_mu = sim["retorno_anual"] / mu0 if mu0 else 1.0
+    scale_sig = sim["vol_anual"] / sig0 if sig0 else 1.0
+    mu_a *= scale_mu
+    cov *= scale_sig ** 2
+
+    rng = np.random.default_rng(semilla + n + int(sim["horizonte_meses"]))
+    # Pesos aleatorios (Dirichlet) con sesgo a diversificación
+    W = rng.dirichlet(np.ones(n) * 1.2, size=n_cloud)
+    # Recortar pesos extremos tipo mandato (~15%)
+    W = np.clip(W, 0.0, 0.15)
+    W = W / W.sum(axis=1, keepdims=True)
+
+    rets = W @ mu_a
+    vols = np.sqrt(np.einsum("ij,jk,ik->i", W, cov, W))
+    sharpes = (rets - RF) / np.maximum(vols, 1e-6)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=vols * 100, y=rets * 100, mode="markers",
+        name="Portafolios posibles",
+        marker=dict(
+            size=5, color=sharpes, colorscale="Viridis",
+            colorbar=dict(title="Sharpe", thickness=12, len=0.7),
+            opacity=0.55,
+        ),
+        hovertemplate="Vol %{x:.1f}%<br>Ret %{y:.1f}%<br>Sharpe %{marker.color:.2f}<extra></extra>",
+    ))
+    # Activos individuales (aprox.)
+    fig.add_trace(go.Scatter(
+        x=np.sqrt(np.diag(cov)) * 100, y=mu_a * 100,
+        mode="markers+text", name="Activos",
+        text=df["Ticker"].tolist(), textposition="top center",
+        textfont=dict(size=8),
+        marker=dict(size=8, color="#8A9A95", symbol="diamond"),
+    ))
+    fig.add_trace(go.Scatter(
+        x=[sim["vol_anual"] * 100], y=[sim["retorno_anual"] * 100],
+        mode="markers+text", name="Portafolio actual",
+        text=["Portafolio"], textposition="bottom center",
+        marker=dict(size=14, color=_COLOR_CORAL, symbol="star",
+                    line=dict(width=1, color="#F0EDE8" if ES_OSCURO else "#1A231F")),
+    ))
+    fig.add_trace(go.Scatter(
+        x=[BENCHMARK["vol"] * 100], y=[BENCHMARK["retorno"] * 100],
+        mode="markers+text", name="S&P 500",
+        text=["S&P 500"], textposition="top center",
+        marker=dict(size=11, color="#F0EDE8" if ES_OSCURO else "#1A231F", symbol="square"),
+    ))
+    fig.update_layout(
+        **{k: v for k, v in PLOTLY_LAYOUT.items() if k != "margin"},
+        height=520,
+        legend=dict(orientation="h", y=1.12),
+        margin=dict(l=10, r=10, t=56, b=8),
+    )
+    fig.update_xaxes(title="Volatilidad anual (%)")
+    fig.update_yaxes(title="Retorno anual esperado (%)")
+    return fig
+
+
 def fig_clases(clases: pd.DataFrame):
     fig = px.pie(
         clases,
@@ -1273,7 +1409,7 @@ elif pagina == "Cartera":
         st.markdown(f"**{ticker_sel}** · {row['Clase de Activo']}\n\n"
                     f"- Peso **{pct(row['Peso'])}** · {money(row['Capital'], moneda)}\n- {rol}")
         st.markdown(card_close(), unsafe_allow_html=True)
-    if "distribucion" in graficos:
+    if SHOW_COLAB_REFS and "distribucion" in graficos:
         st.markdown("---")
         st.markdown(
             f'{card_open("Comparación con artefacto Colab")}'
@@ -1310,7 +1446,7 @@ elif pagina == "Riesgo":
         )
         st.plotly_chart(fig_bootstrap_vivo(sim), use_container_width=True, key="plotly_bootstrap_vivo")
         st.markdown(card_close(), unsafe_allow_html=True)
-        if "bootstrap" in graficos:
+        if SHOW_COLAB_REFS and "bootstrap" in graficos:
             st.markdown(f'{card_open("Comparación con artefacto Colab")}', unsafe_allow_html=True)
             st.caption(
                 "Histograma fijo del notebook (block bootstrap original). "
@@ -1364,12 +1500,25 @@ elif pagina == "Desempeño":
             <span class="{pill_cls}">{etiqueta}</span>{card_close()}""",
             unsafe_allow_html=True,
         )
+
+    st.markdown(f'{card_open("Mapa riesgo–retorno (escenario vivo)")}', unsafe_allow_html=True)
+    st.caption(
+        "Se actualiza con los parámetros. La frontera es una aproximación con covarianza simplificada "
+        "(no reemplaza el block Markowitz del Colab)."
+    )
+    st.plotly_chart(fig_vs_benchmark_vivo(sim), use_container_width=True, key="plotly_vs_bm_vivo")
+    st.plotly_chart(fig_frontera_aprox(sim), use_container_width=True, key="plotly_frontera_vivo")
+    st.markdown(card_close(), unsafe_allow_html=True)
+
     if "vs_benchmark" in graficos or "frontera" in graficos:
+        st.markdown(f'{card_open("Comparación con artefacto Colab")}', unsafe_allow_html=True)
+        st.caption("Imágenes fijas del notebook (no cambian con parámetros). Contrástalas con los gráficos vivos de arriba.")
         g1, g2 = st.columns(2)
         if "vs_benchmark" in graficos:
-            g1.image(str(graficos["vs_benchmark"]), use_container_width=True)
+            g1.image(str(graficos["vs_benchmark"]), caption="Referencia Colab · vs benchmark", use_container_width=True)
         if "frontera" in graficos:
-            g2.image(str(graficos["frontera"]), use_container_width=True)
+            g2.image(str(graficos["frontera"]), caption="Referencia Colab · frontera eficiente", use_container_width=True)
+        st.markdown(card_close(), unsafe_allow_html=True)
 
 # -- EL ASISTENTE --─
 elif pagina == "El asistente":
