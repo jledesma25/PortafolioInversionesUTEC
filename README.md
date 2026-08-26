@@ -30,6 +30,8 @@ Extras: **modo claro / oscuro**, barra de parámetros en vivo, recorrido guiado 
 - **Plotly** — gráficos interactivos
 - Datos calibrados del notebook Colab del Grupo 3 (`data/grupo3/`)
 
+**Identidad visual:** modo oscuro forest (`#0D1110`), cards `#1A231F`, acento coral `#E69984`, sage `#94B8A3`, tipografía Inter + Playfair Display.
+
 La app en producción usa un **simulador local** (`simulador.py`) sobre métricas ya calibradas. El módulo `motor.py` contiene el pipeline cuantitativo completo (yfinance + Markowitz + bootstrap) usado en el análisis original.
 
 ---
@@ -75,8 +77,10 @@ App/
 | `presentacion.py` | Frases para el comité y pasos del recorrido demo |
 | `motor.py` | Descarga de precios, optimización Markowitz, VaR bootstrap, gobernanza |
 
-Documentación ampliada (arquitectura, flujo de datos, decisiones de diseño):  
-➡️ [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md)
+Documentación ampliada (arquitectura, flujo de datos, decisiones de diseño):
+
+- Markdown: [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md)
+- PDF: [`docs/DOCUMENTACION_TECNICA.pdf`](docs/DOCUMENTACION_TECNICA.pdf)
 
 ---
 
