@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 import agente_chat
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -756,6 +757,53 @@ def fig_pesos_top(pesos: pd.DataFrame, top_n: int = 8):
     return fig
 
 
+def fig_bootstrap_vivo(sim: dict, n_sims: int = 5_000, semilla: int = 29):
+    """Histograma vivo de valor al horizonte (aprox. normal calibrada al escenario actual)."""
+    from math import sqrt
+
+    rng = np.random.default_rng(semilla + int(sim["n_activos"]) + int(sim["horizonte_meses"]))
+    t = sim["horizonte_meses"] / 12.0
+    capital = float(sim["capital_m"])
+    mon = sim["moneda"]
+
+    def _muestras(mu: float, sigma: float) -> np.ndarray:
+        r = rng.normal(mu, max(sigma, 1e-6), n_sims)
+        r = np.clip(r, -0.95, None)
+        return capital * (1.0 + r)
+
+    bm = sim["benchmark"]
+    vals_p = _muestras(sim["retorno_h"], sim["vol_h"])
+    vals_b = _muestras(bm["retorno_anual"] * t, bm["vol_anual"] * sqrt(t))
+
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=vals_p, name=f"Portafolio ({sim['perfil']})",
+        opacity=0.72, marker_color=_COLOR_CORAL, nbinsx=45,
+    ))
+    fig.add_trace(go.Histogram(
+        x=vals_b, name="Benchmark (S&P 500)",
+        opacity=0.55, marker_color="#8A9A95", nbinsx=45,
+    ))
+    fig.add_vline(
+        x=capital, line_dash="dash", line_color="#F0EDE8" if ES_OSCURO else "#1A231F",
+        annotation_text="Capital inicial", annotation_position="top",
+    )
+    fig.update_layout(
+        **{k: v for k, v in PLOTLY_LAYOUT.items() if k != "margin"},
+        barmode="overlay",
+        height=380,
+        title=dict(
+            text=f"Distribución simulada del valor a {sim['horizonte_meses']} m (vivo)",
+            font=dict(size=13), x=0.02,
+        ),
+        legend=dict(orientation="h", y=1.12),
+        margin=dict(l=10, r=10, t=56, b=8),
+    )
+    fig.update_xaxes(title=f"Valor a {sim['horizonte_meses']} m ({mon})")
+    fig.update_yaxes(title="Frecuencia (simulaciones)")
+    return fig
+
+
 def fig_clases(clases: pd.DataFrame):
     fig = px.pie(
         clases,
@@ -1226,7 +1274,17 @@ elif pagina == "Cartera":
                     f"- Peso **{pct(row['Peso'])}** · {money(row['Capital'], moneda)}\n- {rol}")
         st.markdown(card_close(), unsafe_allow_html=True)
     if "distribucion" in graficos:
-        st.image(str(graficos["distribucion"]), caption="Referencia Colab", use_container_width=True)
+        st.markdown("---")
+        st.markdown(
+            f'{card_open("Comparación con artefacto Colab")}'
+            "<p style='opacity:.85;font-size:.9rem;margin:0 0 10px'>"
+            "Imagen <b>fija</b> del notebook (Máx. Sharpe · S/ 1,000,000 · 20 activos). "
+            "No cambia con la barra de parámetros. Úsala para contrastar con el escenario vivo de arriba "
+            "(barras + Top 8 + Otros)."
+            f"</p>{card_close()}",
+            unsafe_allow_html=True,
+        )
+        st.image(str(graficos["distribucion"]), caption="Referencia Colab · distribución de capital", use_container_width=True)
 
 # -- RIESGO --─
 elif pagina == "Riesgo":
@@ -1245,8 +1303,21 @@ elif pagina == "Riesgo":
         f2.metric("Esperado", money(sim["esperado"], moneda))
         f3.metric("Adverso", money(sim["adverso"], moneda))
         st.markdown(card_close(), unsafe_allow_html=True)
+        st.markdown(f'{card_open("Distribución de valor (escenario vivo)")}', unsafe_allow_html=True)
+        st.caption(
+            "Se recalcula al cambiar capital, perfil, horizonte o nº de activos "
+            "(aproximación calibrada al simulador; no es el block bootstrap del Colab)."
+        )
+        st.plotly_chart(fig_bootstrap_vivo(sim), use_container_width=True, key="plotly_bootstrap_vivo")
+        st.markdown(card_close(), unsafe_allow_html=True)
         if "bootstrap" in graficos:
-            st.image(str(graficos["bootstrap"]), caption="Bootstrap Colab", use_container_width=True)
+            st.markdown(f'{card_open("Comparación con artefacto Colab")}', unsafe_allow_html=True)
+            st.caption(
+                "Histograma fijo del notebook (block bootstrap original). "
+                "Contrástalo con el gráfico vivo de arriba."
+            )
+            st.image(str(graficos["bootstrap"]), caption="Referencia Colab · bootstrap a 1 año", use_container_width=True)
+            st.markdown(card_close(), unsafe_allow_html=True)
     with side:
         st.markdown(
             f"""{card_open("Riesgos que gestionamos")}
